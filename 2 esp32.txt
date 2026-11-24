@@ -1,0 +1,105 @@
+//transmitter
+#include <WiFi.h>
+#include <DHT.h>
+
+#define DHTPIN 4
+#define DHTTYPE DHT11
+
+DHT dht(DHTPIN, DHTTYPE);
+
+const char* ssid = "ESP32_NETWORK";
+const char* password = "12345678";
+
+WiFiServer server(1234);
+
+void setup() {
+  Serial.begin(115200);
+  dht.begin();
+
+  WiFi.softAP(ssid, password);
+  server.begin();
+
+  Serial.println("Server Started");
+  Serial.println(WiFi.softAPIP());
+}
+
+void loop() {
+  WiFiClient client = server.available();
+
+  if (client) {
+    float temp = dht.readTemperature();
+    float humidity = dht.readHumidity();
+
+    if (!isnan(temp) && !isnan(humidity)) {
+      client.print(temp);
+      client.print(",");
+      client.println(humidity);
+
+      Serial.print("Temperature: ");
+      Serial.println(temp);
+
+      Serial.print("Humidity: ");
+      Serial.println(humidity);
+    }
+
+    client.stop();
+  }
+
+  delay(2000);
+}
+
+//receiver
+#include <WiFi.h>
+
+const char* ssid = "ESP32_NETWORK";
+const char* password = "12345678";
+
+IPAddress serverIP(192, 168, 4, 1);
+
+WiFiClient client;
+
+void setup() {
+  Serial.begin(115200);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.println("Connecting...");
+  }
+
+  Serial.println("WiFi Connected");
+}
+
+void loop() {
+  if (client.connect(serverIP, 1234)) {
+
+    while (!client.available()) {
+      delay(10);
+    }
+
+    String data = client.readStringUntil('\n');
+
+    int comma = data.indexOf(',');
+
+    if (comma != -1) {
+      float temp = data.substring(0, comma).toFloat();
+      float humidity = data.substring(comma + 1).toFloat();
+
+      Serial.print("Temperature: ");
+      Serial.print(temp);
+      Serial.println(" C");
+
+      Serial.print("Humidity: ");
+      Serial.print(humidity);
+      Serial.println(" %");
+    }
+
+    client.stop();
+
+  } else {
+    Serial.println("Connection Failed");
+  }
+
+  delay(2000);
+}

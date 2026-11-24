@@ -1,0 +1,87 @@
+//mqtt
+#include <WiFi.h>
+#include <PubSubClient.h>
+#include "DHT.h"
+
+// WiFi
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+
+// ThingSpeak MQTT
+const char* mqtt_server = "mqtt3.thingspeak.com";
+const int mqtt_port = 1883;
+
+const char* clientID = "YOUR_THINGSPEAK_CLIENT_ID";
+const char* username = "YOUR_THINGSPEAK_USERNAME";
+const char* mqtt_password = "YOUR_THINGSPEAK_MQTT_PASSWORD";
+
+const char* topic = "channels/3595797/publish";
+
+// DHT22
+#define DHTPIN 4
+#define DHTTYPE DHT22
+
+DHT dht(DHTPIN, DHTTYPE);
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void setup() {
+  Serial.begin(115200);
+
+  dht.begin();
+
+  WiFi.begin(ssid, password);
+
+  Serial.print("Connecting to WiFi");
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("\nWiFi Connected!");
+
+  client.setServer(mqtt_server, mqtt_port);
+}
+
+void loop() {
+
+  if (!client.connected()) {
+    Serial.print("Connecting to MQTT...");
+
+    if (client.connect(clientID, username, mqtt_password)) {
+      Serial.println("Connected!");
+    } else {
+      Serial.println("Failed!");
+      delay(2000);
+      return;
+    }
+  }
+
+  float humidity = dht.readHumidity();
+  float temperature = dht.readTemperature();
+
+  if (isnan(humidity) || isnan(temperature)) {
+    Serial.println("DHT22 Read Failed!");
+    delay(2000);
+    return;
+  }
+
+  String payload = "field1=" + String(humidity);
+  payload += "&field2=" + String(temperature);
+
+  Serial.print("Temperature: ");
+  Serial.println(temperature);
+
+  Serial.print("Humidity: ");
+  Serial.println(humidity);
+
+  if (client.publish(topic, payload.c_str())) {
+    Serial.println("Data Published Successfully!");
+  } else {
+    Serial.println("Publish Failed!");
+  }
+
+  delay(20000);
+}
